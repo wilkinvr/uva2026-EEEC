@@ -38,9 +38,9 @@ parsec-dependencies :
 
 parsec-build : parsec-dependencies parsec-core parsec-input-sim
 	make -C ${HOOKS_DIR}
-	cd parsec-2.1; ./bin/parsecmgmt -a build -p bench -c gcc-sniper
-	cd parsec-2.1; ./bin/parsecmgmt -a clean -c gcc-sniper
+	cd parsec-2.1; bash bin/parsecmgmt -a build -p bench -c gcc-sniper
+	cd parsec-2.1; bash bin/parsecmgmt -a clean -c gcc-sniper
 
 clean :
 	make -C ${HOOKS_DIR} clean
-	cd parsec-2.1; ./bin/parsecmgmt -a uninstall -p all -c gcc-sniper
+	cd parsec-2.1; bash bin/parsecmgmt -a uninstall -p all -c gcc-sniper

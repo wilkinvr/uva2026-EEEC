@@ -35,35 +35,29 @@ public:
         double minTemp = std::numeric_limits<double>::max();
 
         for (int core = 0; core < numberOfCores; core++) {
+            if (taskIds[core] == -1) continue;  // skip cores with no thread
             double temp = performanceCounters->getTemperatureOfCore(core);
-
-            if (activeCores[core] && taskIds[core] != -1) {
-                // This core has an active thread: candidate to migrate FROM
-                if (temp > maxTemp) {
-                    maxTemp = temp;
-                    hottestCore = core;
-                }
+            if (temp > maxTemp) {
+                maxTemp = temp;
+                hottestCore = core;
             }
-
-            if (!activeCores[core] || taskIds[core] == -1) {
-                // This core is idle — candidate to migrate TO
-                if (temp < minTemp) {
-                    minTemp = temp;
-                    coolestCore = core;
-                }
+            if (temp < minTemp) {
+                minTemp = temp;
+                coolestCore = core;
             }
         }
 
         // Only migrate if there is a meaningful temperature difference (>= 2°C)
-        // and both a hot source core and a cool destination core exist
-        if (hottestCore != -1 && coolestCore != -1 && (maxTemp - minTemp) >= 2.0) {
-            std::cout << "[MigrationHeatAndRun] Migrating thread from core "
-                      << hottestCore << " (" << maxTemp << "°C) to core "
-                      << coolestCore << " (" << minTemp << "°C)" << std::endl;
+        // and both cores are different
+        if (hottestCore != -1 && coolestCore != -1 && hottestCore != coolestCore
+                && (maxTemp - minTemp) >= 2.0) {
+            std::cout << "[MigrationHeatAndRun] Swapping thread from core "
+                      << hottestCore << " (" << maxTemp << "C) to core "
+                      << coolestCore << " (" << minTemp << "C)" << std::endl;
             migration m;
             m.fromCore = hottestCore;
             m.toCore   = coolestCore;
-            m.swap     = false;
+            m.swap     = true;  // swap: both cores have threads, exchange them
             migrations.push_back(m);
         }
 
