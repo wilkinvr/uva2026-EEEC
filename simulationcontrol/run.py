@@ -268,7 +268,7 @@ def example():
                       #'parsec-dedup',
                       #'parsec-ferret'
                       #'parsec-fluidanimate',
-                      #'parsec-streamcluster',
+                      'parsec-streamcluster',
                       #'parsec-swaptions',
                       #'parsec-x264',
                       #'splash2-barnes',
@@ -368,12 +368,24 @@ def multi_program():
     run(base_configuration, benchmarks)
 
     
+def test_dvfs():
+    for benchmark_name in ('parsec-blackscholes', 'parsec-streamcluster'):
+        instance = get_instance(benchmark_name, 3, input_set='simsmall')
+        
+        for freq in ('1.0GHz', '2.0GHz', '3.0GHz', '4.0GHz'):
+            run([freq, 'maxFreq', 'slowDVFS'], instance)
+
+        for dvfs_level in ('slowDVFS', 'mediumDVFS', 'fastDVFS'):
+            run(['4.0GHz', 'PCGov', dvfs_level], instance)
+
+
 def test_static_power():
     run(['4.0GHz', 'testStaticPower', 'slowDVFS'], get_instance('parsec-blackscholes', 3, input_set='simsmall'))
 
 
 def main():
-    example()
+    test_dvfs()
+    # example()
     # test_static_power()
     # multi_program()
 
