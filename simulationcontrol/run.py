@@ -374,7 +374,7 @@ def test_static_power():
 
 def assignment2_multiprogramming():
     input_set = 'simsmall'
-    base_configuration = ['Assignment2_MultiProgramming', '4.0GHz', 'PCGov', 'slowDVFS']
+    base_configuration = ['Assignment2_MultiProgramming', '4.0GHz', 'maxFreq', 'slowDVFS']
 
     # 1) Single baseline blackscholes: 1 instance of blackscholes with 2 threads (1 Master and 1 Slave Thread)
     run(
