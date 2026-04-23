@@ -372,8 +372,27 @@ def test_static_power():
     run(['4.0GHz', 'testStaticPower', 'slowDVFS'], get_instance('parsec-blackscholes', 3, input_set='simsmall'))
 
 
+def multithreading():
+    input_set = 'small'
+    base_configuration = ['4.0GHz', 'maxFreq', 'slowDVFS']
+    if ENABLE_HEARTBEATS == True:
+        base_configuration.append('hb_enabled')
+
+    benchmarks = (
+        'splash2-barnes',
+        'splash2-fmm',
+        'splash2-lu.cont',
+        'splash2-water.nsq',
+    )
+
+    for benchmark in benchmarks:
+        for parallelism in (1, 2, 3, 4):
+            run(base_configuration, get_instance(benchmark, parallelism, input_set=input_set))
+
+
 def main():
-    example()
+    multithreading()
+    # example()
     # test_static_power()
     # multi_program()
 
