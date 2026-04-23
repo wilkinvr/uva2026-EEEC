@@ -129,8 +129,10 @@ def run(base_configuration, benchmark, ignore_error=False, perforation_script: s
     if 'fastDVFS' in base_configuration:
         periodicPower = 100000
 
-    if not perforation_script:
-        perforation_script = 'magic_perforation_rate:' 
+    if perforation_script:
+        perforation_arg = ' -s' + perforation_script
+    else:
+        perforation_arg = ''
    
     args = '-n {number_cores} -c {config} --benchmarks={benchmark} --no-roi --sim-end=last -senergystats:{periodic} -speriodic-power:{periodic}{script}{perforation}{benchmark_options}' \
         .format(number_cores=NUMBER_CORES,
@@ -138,7 +140,7 @@ def run(base_configuration, benchmark, ignore_error=False, perforation_script: s
                 benchmark=benchmark,
                 periodic=periodicPower,
                 script= ''.join([' -s' + s for s in SCRIPTS]),
-                perforation=' -s'+perforation_script,
+                perforation=perforation_arg,
                 benchmark_options=''.join([' -B ' + opt for opt in benchmark_options]))
     
     console_output = ''
@@ -168,7 +170,10 @@ def run(base_configuration, benchmark, ignore_error=False, perforation_script: s
     save_output(base_configuration, benchmark, console_output, cpistack, started, ended)
 
     if p.returncode != 0:
-        raise Exception('return code != 0')
+        if ignore_error:
+            print('[WARNING] Simulation returned non-zero exit code, continuing anyway.')
+        else:
+            raise Exception('return code != 0')
 
 
 def try_run(base_configuration, benchmark, ignore_error=False):
@@ -372,8 +377,48 @@ def test_static_power():
     run(['4.0GHz', 'testStaticPower', 'slowDVFS'], get_instance('parsec-blackscholes', 3, input_set='simsmall'))
 
 
+def assignment2_thread_migration():
+    """
+    Assignment 2 - Thread Migration characterization.
+
+    Runs blackscholes and streamcluster with:
+      - No migration (baseline)
+      - Heat-and-run migration at slow epoch  (little migration  - 1,000,000 ns)
+      - Heat-and-run migration at medium epoch (moderate migration - 100,000 ns)
+      - Heat-and-run migration at fast epoch  (too much migration - 10,000 ns)
+
+    Frequency is fixed at 4GHz with maxFreq DVFS so that migration epoch is
+    the only variable changing between experiments (one variable at a time).
+
+    Measures: response time (ms), avg power (W), peak temperature (°C).
+    """
+    input_set = 'simsmall'
+    freq = '4.0GHz'
+
+    for benchmark in ('parsec-blackscholes', 'parsec-streamcluster'):
+        # Use 4 threads (simsmall-3 traces exist on DAS-5)
+        parallelism = 4
+
+        # Baseline: no migration
+        run([freq, 'maxFreq', 'slowDVFS', 'migrationOff'],
+            get_instance(benchmark, parallelism, input_set=input_set), ignore_error=True)
+
+        # Heat-and-run: slow epoch (little migration)
+        run([freq, 'maxFreq', 'slowDVFS', 'migrationHeatAndRun', 'migrationEpochSlow'],
+            get_instance(benchmark, parallelism, input_set=input_set), ignore_error=True)
+
+        # Heat-and-run: medium epoch
+        run([freq, 'maxFreq', 'slowDVFS', 'migrationHeatAndRun', 'migrationEpochMedium'],
+            get_instance(benchmark, parallelism, input_set=input_set), ignore_error=True)
+
+        # Heat-and-run: fast epoch (too much migration)
+        run([freq, 'maxFreq', 'slowDVFS', 'migrationHeatAndRun', 'migrationEpochFast'],
+            get_instance(benchmark, parallelism, input_set=input_set), ignore_error=True)
+
+
 def main():
-    example()
+    assignment2_thread_migration()
+    # example()
     # test_static_power()
     # multi_program()
 

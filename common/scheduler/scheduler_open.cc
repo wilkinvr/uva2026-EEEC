@@ -19,6 +19,7 @@
 #include "policies/dvfsTestStaticPower.h"
 #include "policies/mapFirstUnused.h"
 #include "policies/pcgov.h"
+#include "policies/migrationHeatAndRun.h"
 
 #include <iomanip>
 #include <random>
@@ -359,6 +360,8 @@ void SchedulerOpen::initMigrationPolicy(String policyName) {
 	cout << "[Scheduler] [Info]: Initializing migration policy" << endl;
 	if (policyName == "off") {
 		migrationPolicy = NULL;
+	} else if (policyName == "heatAndRun") {
+		migrationPolicy = new MigrationHeatAndRun(performanceCounters, numberOfCores);
 	} //else if (policyName ="XYZ") {... } //Place to instantiate a new migration logic. Implementation is put in "policies" package.
 	else {
 		cout << "\n[Scheduler] [Error]: Unknown Migration Algorithm" << endl;
