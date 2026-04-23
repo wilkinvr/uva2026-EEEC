@@ -372,8 +372,52 @@ def test_static_power():
     run(['4.0GHz', 'testStaticPower', 'slowDVFS'], get_instance('parsec-blackscholes', 3, input_set='simsmall'))
 
 
+def assignment2_multiprogramming():
+    input_set = 'simsmall'
+    base_configuration = ['Assignment2_MultiProgramming', '4.0GHz', 'PCGov', 'slowDVFS']
+
+    # 1) Single baseline blackscholes: 1 instance of blackscholes with 2 threads (1 Master and 1 Slave Thread)
+    run(
+        base_configuration,
+        get_instance('parsec-blackscholes', 2, input_set=input_set)
+    )
+
+    # 2) Single baseline streamcluster: 1 instance of streamcluster with 2 threads (1 Master and 1 Slave Thread)
+    run(
+        base_configuration,
+        get_instance('parsec-streamcluster', 2, input_set=input_set)
+    )
+
+    # 3) Multiprogram symmetric blackscholes: 2 instances of blackscholes with 2 threads each (2 Master Threads and 2 Slave Threads)
+    run(
+        base_configuration,
+        '{},{}'.format(
+            get_instance('parsec-blackscholes', 2, input_set=input_set),
+            get_instance('parsec-blackscholes', 2, input_set=input_set)
+        )
+    )
+
+    # 4) Multiprogram symmetric streamcluster: 2 instances of streamcluster with 2 threads each (2 Master Threads and 2 Slave Threads)
+    run(
+        base_configuration,
+        '{},{}'.format(
+            get_instance('parsec-streamcluster', 2, input_set=input_set),
+            get_instance('parsec-streamcluster', 2, input_set=input_set)
+        )
+    )
+
+    # 5) Multiprogram asymmetric blackscholes and streamcluster: 1 instance of blackscholes and 1 instance of streamcluster with 2 threads each (2 Master Thread and 2 Slave Threads)    
+    run(
+        base_configuration,
+        '{},{}'.format(
+            get_instance('parsec-blackscholes', 2, input_set=input_set),
+            get_instance('parsec-streamcluster', 2, input_set=input_set)
+        )
+    )
+
 def main():
-    example()
+    assignment2_multiprogramming()
+    # example()
     # test_static_power()
     # multi_program()
 
