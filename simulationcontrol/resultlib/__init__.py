@@ -21,7 +21,7 @@ def get_runs():
     for result_dir in RESULT_DIRS:
         if os.path.exists(result_dir):
             for dirname in os.listdir(result_dir):
-                if dirname.startswith('results_'):
+                if dirname.startswith('results_') and os.path.isdir(os.path.join(result_dir, dirname)):
                     yield dirname
 
 

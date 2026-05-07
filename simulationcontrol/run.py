@@ -379,12 +379,23 @@ def test_dvfs():
             run(['4.0GHz', 'PCGov', dvfs_level], instance)
 
 
+def test_sota():
+    for benchmark_name in ('parsec-blackscholes', 'parsec-streamcluster'):
+        instance = get_instance(benchmark_name, 3, input_set='simsmall')
+
+        # DTM: binary thermal DVFS + reactive thermal migration
+        run(['4.0GHz', 'thermal_binary', 'thermal_migration', 'fastDVFS'], instance)
+
+        # Baseline: max frequency, no thermal management
+        run(['2.0GHz', 'maxFreq', 'fastDVFS'], instance)
+
 def test_static_power():
     run(['4.0GHz', 'testStaticPower', 'slowDVFS'], get_instance('parsec-blackscholes', 3, input_set='simsmall'))
 
 
 def main():
-    test_dvfs()
+    test_sota()
+    # test_dvfs()
     # example()
     # test_static_power()
     # multi_program()

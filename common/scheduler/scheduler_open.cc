@@ -17,8 +17,10 @@
 #include "policies/dvfsFixedPower.h"
 #include "policies/dvfsTSP.h"
 #include "policies/dvfsTestStaticPower.h"
+#include "policies/dvfs_thermal.h"
 #include "policies/mapFirstUnused.h"
 #include "policies/pcgov.h"
+#include "policies/mapping_thermal.h"
 
 #include <iomanip>
 #include <random>
@@ -346,6 +348,8 @@ void SchedulerOpen::initDVFSPolicy(String policyName) {
 		String thermalModelFilename = Sim()->getCfg()->getString("periodic_thermal/thermal_model");
 		thermalModel = new ThermalModel((unsigned int)coreRows, (unsigned int)coreColumns, thermalModelFilename, ambientTemperature, maxTemperature, inactivePower, tdp);
 		dvfsPolicy = new DVFSTSP(thermalModel, performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency, frequencyStepSize);
+	} else if (policyName == "thermal_binary") {
+		dvfsPolicy = new DVFSThermal(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency);
 	} else {
 		cout << "\n[Scheduler] [Error]: Unknown DVFS Algorithm" << endl;
  		exit (1);
@@ -359,6 +363,8 @@ void SchedulerOpen::initMigrationPolicy(String policyName) {
 	cout << "[Scheduler] [Info]: Initializing migration policy" << endl;
 	if (policyName == "off") {
 		migrationPolicy = NULL;
+	} else if (policyName == "thermal_migration") {
+		migrationPolicy = new MappingThermal(performanceCounters, numberOfCores);
 	} //else if (policyName ="XYZ") {... } //Place to instantiate a new migration logic. Implementation is put in "policies" package.
 	else {
 		cout << "\n[Scheduler] [Error]: Unknown Migration Algorithm" << endl;
