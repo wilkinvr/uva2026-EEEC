@@ -379,19 +379,35 @@ def test_dvfs():
             run(['4.0GHz', 'PCGov', dvfs_level], instance)
 
 
-def test_sota():
-    for benchmark_name in ('parsec-blackscholes', 'parsec-streamcluster'):
-        instance = get_instance(benchmark_name, 3, input_set='simsmall')
-
-        # DTM: binary thermal DVFS + reactive thermal migration
-        run(['4.0GHz', 'thermal_binary', 'thermal_migration', 'fastDVFS'], instance)
-
-        # Baseline: max frequency, no thermal management
-        run(['2.0GHz', 'maxFreq', 'fastDVFS'], instance)
 
 def test_static_power():
     run(['4.0GHz', 'testStaticPower', 'slowDVFS'], get_instance('parsec-blackscholes', 3, input_set='simsmall'))
 
+def test_sota():
+    benchmark_names = ('parsec-blackscholes', 'parsec-streamcluster')
+    configs = (
+        # DTM: binary thermal DVFS + reactive thermal migration
+        ('thermal_binary', 'thermal_migration'),
+        # Baseline: ondemandGovernor
+        ('ondemand',),
+        # Baseline: ColdestCore migration
+        ('coldestCore',),
+    )
+
+    # Single-program - blackscholes + streamcluster separately
+    for benchmark_name in benchmark_names:
+        single_instance = get_instance(benchmark_name, 4, input_set='simsmall')
+        for config in configs:
+            run(['SOTA_SingleProgram', '4.0GHz', *config, 'fastDVFS'], single_instance)
+
+    # Multi-program - blackscholes + streamcluster together 
+    multi_instances = ','.join(
+        get_instance(benchmark_name, 2, input_set='simsmall')
+        for benchmark_name in benchmark_names
+    )
+    for config in configs:
+        run(['SOTA_MultiProgram', '4.0GHz', *config, 'fastDVFS'], multi_instances)
+    
 
 def main():
     test_sota()
