@@ -311,7 +311,9 @@
 	 } else if (policyName == "coldestCore") {
 		 float criticalTemperature = Sim()->getCfg()->getFloat("scheduler/open/migration/coldestCore/criticalTemperature");
 		 mappingPolicy = new ColdestCore(performanceCounters, coreRows, coreColumns, criticalTemperature);
-	 }
+	 } else if (policyName == "thermal_migration") {
+		migrationPolicy = new MappingThermal(performanceCounters, numberOfCores);
+   }
 	 else {
 		 cout << "\n[Scheduler] [Error]: Unknown Mapping Algorithm" << endl;
 		  exit (1);
@@ -358,7 +360,9 @@
 		 float dtmCriticalTemperature = Sim()->getCfg()->getFloat("scheduler/open/dvfs/ondemand/dtm_critical_temperature");
 		 float dtmRecoveredTemperature = Sim()->getCfg()->getFloat("scheduler/open/dvfs/ondemand/dtm_recovered_temperature");
 		 dvfsPolicy = new DVFSOndemand(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency, frequencyStepSize, upThreshold, downThreshold, dtmCriticalTemperature, dtmRecoveredTemperature);
-	 } else {
+	 } else if (policyName == "thermal_binary") {
+		dvfsPolicy = new DVFSThermal(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency);
+   } else {
 		 cout << "\n[Scheduler] [Error]: Unknown DVFS Algorithm" << endl;
 		  exit (1);
 	 }
