@@ -21,6 +21,8 @@
  #include "policies/pcgov.h"
  #include "policies/dvfsOndemand.h"
  #include "policies/coldestCore.h"
+ #include "policies/mapping_thermal.h"
+ #include "policies/dvfs_thermal.h"
  
  #include <iomanip>
  #include <random>
@@ -361,8 +363,8 @@
 		 float dtmRecoveredTemperature = Sim()->getCfg()->getFloat("scheduler/open/dvfs/ondemand/dtm_recovered_temperature");
 		 dvfsPolicy = new DVFSOndemand(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency, frequencyStepSize, upThreshold, downThreshold, dtmCriticalTemperature, dtmRecoveredTemperature);
 	 } else if (policyName == "thermal_binary") {
-		dvfsPolicy = new DVFSThermal(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency);
-   } else {
+		 dvfsPolicy = new DVFSThermal(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency);
+     } else {
 		 cout << "\n[Scheduler] [Error]: Unknown DVFS Algorithm" << endl;
 		  exit (1);
 	 }
