@@ -381,8 +381,9 @@
 	 else if (policyName == "coldestCore") {
 		 float criticalTemperature = Sim()->getCfg()->getFloat("scheduler/open/migration/coldestCore/criticalTemperature");
 		 migrationPolicy = new ColdestCore(performanceCounters, coreRows, coreColumns, criticalTemperature);
-	 }
-	 else {
+	 } else if (policyName == "thermal_migration") {
+		 migrationPolicy = new MappingThermal(performanceCounters, numberOfCores);
+	 } else {
 		 cout << "\n[Scheduler] [Error]: Unknown Migration Algorithm" << endl;
 		  exit (1);
 	 }
