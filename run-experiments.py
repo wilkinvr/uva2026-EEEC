@@ -98,7 +98,18 @@ def get_workload(benchmark, cores, parallelism=None, number_tasks=None, input_se
 def get_experiments():
     experiments = []
 
-    benchmark_names = ('parsec-blackscholes', 'parsec-streamcluster')
+    # Recommended benchmarks from BENCHMARKS.md.
+    # (benchmark_name, parallelism, input_set)
+    # PARSEC uses simsmall; SPLASH-2 uses small.
+    benchmarks = [
+        ('parsec-blackscholes',  4, 'simsmall'),
+        ('parsec-swaptions',     4, 'simsmall'),
+        ('parsec-streamcluster', 4, 'simsmall'),
+        ('splash2-fft',          4, 'small'),
+        ('splash2-lu.cont',      4, 'small'),
+        ('splash2-radix',        4, 'small'),
+    ]
+
     configs = (
         # DTM: binary thermal DVFS + reactive thermal migration
         ('thermal_binary', 'thermal_migration'),
@@ -106,20 +117,23 @@ def get_experiments():
         ('ondemand',),
         # Baseline: ColdestCore migration
         ('coldestCore',),
+        # Baseline: max frequency, no thermal management
+        ('maxFreq',),
     )
 
-    # Single-program — blackscholes and streamcluster separately
-    for benchmark_name in benchmark_names:
-        instance = get_instance(benchmark_name, 4, input_set='simsmall')
-        short = benchmark_name.replace('parsec-', '')
+    # Single-program — one container per (benchmark, config) pair
+    for benchmark_name, parallelism, input_set in benchmarks:
+        instance = get_instance(benchmark_name, parallelism, input_set=input_set)
+        short = benchmark_name.replace('parsec-', '').replace('splash2-', '')
         for config in configs:
             base_config = ['SOTA_SingleProgram', '4.0GHz', *config, 'fastDVFS']
             label = f"{short}_{'_'.join(config)}"
             experiments.append((label, base_config, instance))
 
-    # Multi-program — blackscholes + streamcluster together
+    # Multi-program — blackscholes + streamcluster together (fits in 4 simulated cores at p=2 each)
     multi_instance = ','.join(
-        get_instance(bm, 2, input_set='simsmall') for bm in benchmark_names
+        get_instance(bm, 2, input_set='simsmall')
+        for bm in ('parsec-blackscholes', 'parsec-streamcluster')
     )
     for config in configs:
         base_config = ['SOTA_MultiProgram', '4.0GHz', *config, 'fastDVFS']
@@ -142,6 +156,28 @@ DEFAULT_RESULTS_DIR = os.path.join(HERE, 'results')
 DEFAULT_SESSION = 'experiments'
 
 
+def _container_runtime():
+    """Return 'docker' if available, 'podman' if not, or raise if neither is found."""
+    for runtime in ('docker', 'podman'):
+        if shutil.which(runtime):
+            return runtime
+    print('Error: neither docker nor podman found on PATH.', file=sys.stderr)
+    sys.exit(1)
+
+
+def result_exists(base_config, benchmark, results_dir):
+    """Return True if a completed result directory exists for this (base_config, benchmark) pair."""
+    benchmark_text = benchmark if len(benchmark) <= 100 else benchmark[:100] + '__etc'
+    suffix = f"{'+'.join(base_config)}_{benchmark_text}"
+    if not os.path.isdir(results_dir):
+        return False
+    for entry in os.listdir(results_dir):
+        if entry.startswith('results_') and entry.endswith(suffix):
+            if os.path.isfile(os.path.join(results_dir, entry, 'executioninfo.txt')):
+                return True
+    return False
+
+
 def build_image():
     print(f'Running make -C ./docker build-experiments')
     subprocess.run(
@@ -162,7 +198,9 @@ def _docker_cmd(base_config, benchmark, results_dir):
         f"run({base_config!r}, {benchmark!r})"
     )
     return [
-        'docker', 'run', '--privileged', '--rm',
+        _container_runtime(), 'run',
+        '--privileged',
+        '--rm',
         '-v', f'{results_dir}:/hotsniper/results',
         '--entrypoint', 'python3',
         DOCKER_EXPERIMENT_IMAGE,
@@ -170,10 +208,20 @@ def _docker_cmd(base_config, benchmark, results_dir):
     ]
 
 
-def launch(experiments, results_dir, session, dry_run=False):
+def launch(experiments, results_dir, session, dry_run=False, skip_duplicates=False):
+    if skip_duplicates:
+        pending, skipped = [], []
+        for exp in experiments:
+            (skipped if result_exists(exp[1], exp[2], results_dir) else pending).append(exp)
+        if skipped:
+            print(f'Skipping {len(skipped)} already-completed experiment(s):')
+            for label, _, _ in skipped:
+                print(f'  [{label}]')
+        experiments = pending
+
     n = len(experiments)
     if n == 0:
-        print('No experiments defined — edit get_experiments() and try again.')
+        print('No experiments to run — all already completed.')
         return
 
     if dry_run:
@@ -231,6 +279,8 @@ def main():
                         help='List experiments and exit without launching')
     parser.add_argument('--dry-run', action='store_true',
                         help='Print the docker commands that would run, without executing')
+    parser.add_argument('--skip-duplicates', action='store_true',
+                        help='Skip experiments that already have a completed result in --results-dir')
     args = parser.parse_args()
 
     experiments = get_experiments()
@@ -246,7 +296,8 @@ def main():
     if args.build:
         build_image()
 
-    launch(experiments, args.results_dir, args.session, dry_run=args.dry_run)
+    launch(experiments, args.results_dir, args.session,
+           dry_run=args.dry_run, skip_duplicates=args.skip_duplicates)
 
 
 if __name__ == '__main__':
