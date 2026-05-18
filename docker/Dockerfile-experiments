@@ -1,0 +1,24 @@
+# Two-stage build: base deps image, then bake in the full project and compile.
+ARG BASE_IMAGE=ubuntu:16.04-sniper
+FROM ${BASE_IMAGE}
+
+# Copy the entire HotSniper project into the image
+COPY . /hotsniper/
+
+# Build HotSpot
+WORKDIR /hotsniper/hotspot
+RUN make
+
+# Build Sniper (requires GRAPHITE_ROOT and BENCHMARKS_ROOT)
+WORKDIR /hotsniper
+ENV GRAPHITE_ROOT=/hotsniper
+ENV BENCHMARKS_ROOT=/hotsniper/benchmarks
+RUN make
+
+# Build benchmarks
+WORKDIR /hotsniper/benchmarks
+RUN make
+
+# Runtime environment
+ENV PYTHONIOENCODING=UTF-8
+WORKDIR /hotsniper

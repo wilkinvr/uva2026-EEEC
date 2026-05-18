@@ -1,0 +1,20 @@
+# Exclude results directories from build context
+results/
+results_*/
+
+# Exclude original pin tarball (pin_kit directory is still included)
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+
+# Exclude docker directory itself
+docker/
+
+# Exclude run-experiments script
+run-experiments.py
+
+# Exclude IDE and git metadata
+.git/
+.gitignore
+*.pyc
+__pycache__/
