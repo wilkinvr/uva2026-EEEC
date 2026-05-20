@@ -95,7 +95,37 @@ def get_workload(benchmark, cores, parallelism=None, number_tasks=None, input_se
 #   benchmark   — benchmark string or comma-separated multi-program string
 # ---------------------------------------------------------------------------
 
+
 def get_experiments():
+    experiments = []
+
+    # Recommended benchmarks from BENCHMARKS.md.
+    # (benchmark_name, parallelism, input_set)
+    # PARSEC uses simsmall; SPLASH-2 uses small.
+    benchmarks = [
+        ('parsec-blackscholes',  4, 'simsmall'),
+        ('parsec-swaptions',     4, 'simsmall'),
+        ('parsec-streamcluster', 4, 'simsmall'),
+        ('splash2-fft',          4, 'small'),
+        ('splash2-lu.cont',      4, 'small'),
+        ('splash2-radix',        4, 'small'),
+    ]
+
+    # Fixed-frequency maxFreq runs across 2.0–4.0 GHz in 0.2 GHz steps.
+    # Each frequency has a matching cfg tag in config/base.cfg.
+    frequencies = [f'{f:.1f}GHz' for f in [2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0]]
+
+    for benchmark_name, parallelism, input_set in benchmarks:
+        instance = get_instance(benchmark_name, parallelism, input_set=input_set)
+        short = benchmark_name.replace('parsec-', '').replace('splash2-', '')
+        for freq in frequencies:
+            base_config = ['SOTA_SingleProgram', freq, 'maxFreq', 'fastDVFS']
+            label = f"{short}_maxFreq_{freq}"
+            experiments.append((label, base_config, instance))
+
+    return experiments
+
+def get_experiments2():
     experiments = []
 
     # Recommended benchmarks from BENCHMARKS.md.
