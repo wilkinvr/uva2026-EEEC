@@ -23,6 +23,8 @@
  #include "policies/coldestCore.h"
  #include "policies/mapping_thermal.h"
  #include "policies/dvfs_thermal.h"
+ #include "policies/dvfsPredictive.h"
+ #include "policies/dvfsGroup2.h"
  
  #include <iomanip>
  #include <random>
@@ -364,6 +366,14 @@
 		 dvfsPolicy = new DVFSOndemand(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency, frequencyStepSize, upThreshold, downThreshold, dtmCriticalTemperature, dtmRecoveredTemperature);
 	 } else if (policyName == "thermal_binary") {
 		 dvfsPolicy = new DVFSThermal(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency);
+	 } else if (policyName == "predictive") {
+		 int    horizon      = Sim()->getCfg()->getInt("scheduler/open/dvfs/predictive/horizon");
+		 double thermalLimit = Sim()->getCfg()->getFloat("scheduler/open/dvfs/predictive/thermal_limit");
+		 dvfsPolicy = new DVFSPredictive(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency, frequencyStepSize, horizon, thermalLimit);
+	 } else if (policyName == "group2") {
+		 int    horizon      = Sim()->getCfg()->getInt("scheduler/open/dvfs/group2/horizon");
+		 double thermalLimit = Sim()->getCfg()->getFloat("scheduler/open/dvfs/group2/thermal_limit");
+		 dvfsPolicy = new DVFSGroup2(performanceCounters, coreRows, coreColumns, minFrequency, maxFrequency, frequencyStepSize, horizon, thermalLimit);
      } else {
 		 cout << "\n[Scheduler] [Error]: Unknown DVFS Algorithm" << endl;
 		  exit (1);

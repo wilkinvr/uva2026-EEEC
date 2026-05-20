@@ -1,11 +1,74 @@
 # Two-stage build: base deps image, then bake in the full project and compile.
-ARG BASE_IMAGE=ubuntu:16.04-sniper
+ARG BASE_IMAGE=ubuntu:18.04-sniper
 FROM ${BASE_IMAGE}
 
-# Copy the entire HotSniper project into the image
-COPY . /hotsniper/
+
+# Build Python 3.10 from source so dvfs_server.py can use the same xgboost
+# major version (3.x) as the host that trained the model.
+# altinstall keeps system python3 (3.6) intact for simulationcontrol scripts.
+RUN apt-get update && apt-get install -y \
+    libssl-dev libffi-dev liblzma-dev libsqlite3-dev libreadline-dev cmake \
+ && rm -rf /var/lib/apt/lists/*
+RUN wget -q https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tgz \
+ && tar xf Python-3.10.14.tgz \
+ && cd Python-3.10.14 \
+ && ./configure --prefix=/usr/local --enable-shared --with-ensurepip=install \
+ && make -j$(nproc) \
+ && make altinstall \
+ && ldconfig \
+ && cd / && rm -rf Python-3.10.14 Python-3.10.14.tgz
+# Install a real cmake binary (self-contained, requires glibc >= 2.17) and
+# ninja so xgboost 3.x can be compiled from source.  The pip cmake wrapper
+# doesn't work inside pip's isolated build environment, but a real binary does.
+# xgboost is built from source because its pre-built wheels require glibc 2.28+
+# while Ubuntu 18.04 ships glibc 2.27; building locally links against 2.27.
+RUN apt-get update && apt-get install -y g++-8 ninja-build && rm -rf /var/lib/apt/lists/*
+RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-linux-x86_64.tar.gz \
+ && tar xf cmake-3.27.9-linux-x86_64.tar.gz -C /opt \
+ && ln -sf /opt/cmake-3.27.9-linux-x86_64/bin/cmake /usr/local/bin/cmake \
+ && rm cmake-3.27.9-linux-x86_64.tar.gz
+RUN CC=gcc-8 CXX=g++-8 pip3.10 install numpy xgboost
+
+# Root build files
+COPY Makefile Makefile.config run-sniper /hotsniper/
+
+# Simulator source
+COPY common/       /hotsniper/common/
+COPY config/       /hotsniper/config/
+COPY decoder_lib/  /hotsniper/decoder_lib/
+COPY floorplanlib/ /hotsniper/floorplanlib/
+COPY frontend/     /hotsniper/frontend/
+COPY include/      /hotsniper/include/
+COPY lib/          /hotsniper/lib/
+COPY perforation/  /hotsniper/perforation/
+COPY pin/          /hotsniper/pin/
+# pin_kit must be present on the host (no auto-download; get from https://www.pintool.org/downloads.html)
+COPY pin_kit/      /hotsniper/pin_kit/
+COPY record-trace  /hotsniper/record-trace
+# reliability is a git submodule — clone it directly so hosts with an
+# uninitialised submodule still work.  Override ubuntu-16.04 makefile because
+# it requires g++-5 which is not available on Ubuntu 18.04.
+RUN git clone --quiet https://github.com/spolstra/hotsniper-reliability.git /hotsniper/reliability \
+ && git -C /hotsniper/reliability reset --quiet --hard 686b5d186fbe9f22ddaedbe39fa261b6941c74ee \
+ && cp /hotsniper/reliability/Makefile.ubuntu-20.04 /hotsniper/reliability/Makefile.ubuntu-16.04
+COPY riscv/        /hotsniper/riscv/
+COPY scripts/      /hotsniper/scripts/
+COPY sift/         /hotsniper/sift/
+COPY standalone/   /hotsniper/standalone/
+COPY test/         /hotsniper/test/
+COPY tools/        /hotsniper/tools/
+# mbuild, xed, xed_kit, mcpat, python_kit are gitignored generated/downloaded artifacts.
+# The `make` step below fetches and builds them automatically.
+
+# Benchmarks and simulation control
+COPY benchmarks/        /hotsniper/benchmarks/
+COPY simulationcontrol/ /hotsniper/simulationcontrol/
+
+# ML inference server
+COPY prediction/ /hotsniper/prediction/
 
 # Build HotSpot
+COPY hotspot/ /hotsniper/hotspot/
 WORKDIR /hotsniper/hotspot
 RUN make
 
@@ -13,10 +76,21 @@ RUN make
 WORKDIR /hotsniper
 ENV GRAPHITE_ROOT=/hotsniper
 ENV BENCHMARKS_ROOT=/hotsniper/benchmarks
-RUN make
+# The reliability target runs `git submodule init/update`; initialise a bare
+# repo so those commands succeed without trying to fetch anything.
+RUN sed -i 's/-Wall -Werror/-Wall/' \
+  pin_kit/source/tools/Config/makefile.unix.config
+RUN git init && make
 
 # Build benchmarks
 WORKDIR /hotsniper/benchmarks
+# If parsec-2.1 was pre-extracted on the host and COPY'd in, the Makefile's
+# parsec-core target is skipped (sentinel file exists).  Apply the global C++98
+# fix here too so it is always present before make runs.
+RUN if [ -f parsec/parsec-2.1/config/gcc-sniper.bldconf ] && \
+       ! grep -q 'std=gnu++98' parsec/parsec-2.1/config/gcc-sniper.bldconf; then \
+      echo 'CXXFLAGS="${CXXFLAGS} -std=gnu++98"' >> parsec/parsec-2.1/config/gcc-sniper.bldconf; \
+    fi
 RUN make
 
 # Runtime environment

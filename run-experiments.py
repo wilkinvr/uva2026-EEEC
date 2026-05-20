@@ -99,9 +99,60 @@ def get_workload(benchmark, cores, parallelism=None, number_tasks=None, input_se
 def get_experiments():
     experiments = []
 
-    # Recommended benchmarks from BENCHMARKS.md.
-    # (benchmark_name, parallelism, input_set)
-    # PARSEC uses simsmall; SPLASH-2 uses small.
+    benchmarks = [
+        # ('parsec-blackscholes',  4, 'simdev'),
+        # ('parsec-streamcluster', 4, 'simdev'),
+        ('parsec-blackscholes',  4, 'simsmall'),
+        ('parsec-streamcluster', 4, 'simsmall'),
+        ('parsec-swaptions',     4, 'simsmall'),
+        ('splash2-fft',          4, 'small'),
+        ('splash2-lu.cont',      4, 'small'),
+        ('splash2-radix',        4, 'small'),
+    ]
+
+    # (label_suffix, cfg_flags)
+    # maxFreq: unconstrained throughput ceiling
+    # ondemand: standard industry reactive baseline
+    # thermal_binary: binary step reactive thermal governor
+    # predictive_hN: our proactive ML governor at horizon N
+    # group2_hN: ML-predicted temperature fed into thermal band logic
+    configs = [
+        # ('maxFreq',              ['maxFreq']),
+        # ('ondemand',             ['ondemand']),
+        # ('thermal',              ['thermal_binary']),
+        ('predictive_h1',        ['predictive', 'horizon1']),
+        ('predictive_h2',        ['predictive', 'horizon2']),
+        ('predictive_h3',        ['predictive', 'horizon3']),
+        ('group2_h1',            ['group2', 'horizon1']),
+        ('group2_h2',            ['group2', 'horizon2']),
+        ('group2_h3',            ['group2', 'horizon3']),
+    ]
+
+    # Single-program
+    for benchmark_name, parallelism, input_set in benchmarks:
+        instance = get_instance(benchmark_name, parallelism, input_set=input_set)
+        short = benchmark_name.replace('parsec-', '').replace('splash2-', '')
+        for label_suffix, cfg_flags in configs:
+            base_config = ['SOTA_SingleProgram', '4.0GHz', *cfg_flags, 'fastDVFS']
+            label = f"{short}_{label_suffix}"
+            experiments.append((label, base_config, instance))
+
+    # Multi-program — blackscholes + streamcluster (p=2 each, fits in 4 cores)
+    multi_instance = ','.join(
+        get_instance(bm, 2, input_set='simsmall')
+        for bm in ('parsec-blackscholes', 'parsec-streamcluster')
+    )
+    for label_suffix, cfg_flags in configs:
+        base_config = ['SOTA_MultiProgram', '4.0GHz', *cfg_flags, 'fastDVFS']
+        label = f"multi_{label_suffix}"
+        experiments.append((label, base_config, multi_instance))
+
+    return experiments
+
+
+def get_training_experiments():
+    experiments = []
+
     benchmarks = [
         ('parsec-blackscholes',  4, 'simsmall'),
         ('parsec-swaptions',     4, 'simsmall'),
@@ -111,8 +162,6 @@ def get_experiments():
         ('splash2-radix',        4, 'small'),
     ]
 
-    # Fixed-frequency maxFreq runs across 2.0–4.0 GHz in 0.2 GHz steps.
-    # Each frequency has a matching cfg tag in config/base.cfg.
     frequencies = [f'{f:.1f}GHz' for f in [2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0]]
 
     for benchmark_name, parallelism, input_set in benchmarks:
@@ -125,53 +174,6 @@ def get_experiments():
 
     return experiments
 
-def get_experiments2():
-    experiments = []
-
-    # Recommended benchmarks from BENCHMARKS.md.
-    # (benchmark_name, parallelism, input_set)
-    # PARSEC uses simsmall; SPLASH-2 uses small.
-    benchmarks = [
-        ('parsec-blackscholes',  4, 'simsmall'),
-        ('parsec-swaptions',     4, 'simsmall'),
-        ('parsec-streamcluster', 4, 'simsmall'),
-        ('splash2-fft',          4, 'small'),
-        ('splash2-lu.cont',      4, 'small'),
-        ('splash2-radix',        4, 'small'),
-    ]
-
-    configs = (
-        # DTM: binary thermal DVFS + reactive thermal migration
-        ('thermal_binary', 'thermal_migration'),
-        # Baseline: ondemandGovernor
-        ('ondemand',),
-        # Baseline: ColdestCore migration
-        ('coldestCore',),
-        # Baseline: max frequency, no thermal management
-        ('maxFreq',),
-    )
-
-    # Single-program — one container per (benchmark, config) pair
-    for benchmark_name, parallelism, input_set in benchmarks:
-        instance = get_instance(benchmark_name, parallelism, input_set=input_set)
-        short = benchmark_name.replace('parsec-', '').replace('splash2-', '')
-        for config in configs:
-            base_config = ['SOTA_SingleProgram', '4.0GHz', *config, 'fastDVFS']
-            label = f"{short}_{'_'.join(config)}"
-            experiments.append((label, base_config, instance))
-
-    # Multi-program — blackscholes + streamcluster together (fits in 4 simulated cores at p=2 each)
-    multi_instance = ','.join(
-        get_instance(bm, 2, input_set='simsmall')
-        for bm in ('parsec-blackscholes', 'parsec-streamcluster')
-    )
-    for config in configs:
-        base_config = ['SOTA_MultiProgram', '4.0GHz', *config, 'fastDVFS']
-        label = f"multi_{'_'.join(config)}"
-        experiments.append((label, base_config, multi_instance))
-
-    return experiments
-
 
 # ---------------------------------------------------------------------------
 # Docker + tmux launcher
@@ -179,7 +181,7 @@ def get_experiments2():
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-_UBUNTU_VERSION = '16.04'
+_UBUNTU_VERSION = '18.04'
 _USER = os.environ.get('USER', 'user')
 DOCKER_EXPERIMENT_IMAGE = f'ubuntu:{_UBUNTU_VERSION}-sniper-experiments-{_USER}'
 DEFAULT_RESULTS_DIR = os.path.join(HERE, 'results')
@@ -225,7 +227,7 @@ def _docker_cmd(base_config, benchmark, results_dir):
         "os.chdir('/hotsniper'); "
         "sys.path.insert(0, '/hotsniper/simulationcontrol'); "
         f"from run import run; "
-        f"run({base_config!r}, {benchmark!r})"
+        f"run({base_config!r}, {benchmark!r}, ignore_error=True)"
     )
     return [
         _container_runtime(), 'run',
@@ -311,9 +313,11 @@ def main():
                         help='Print the docker commands that would run, without executing')
     parser.add_argument('--skip-duplicates', action='store_true',
                         help='Skip experiments that already have a completed result in --results-dir')
+    parser.add_argument('--training', action='store_true',
+                        help='Run training-data collection (maxFreq at 2.0–4.0 GHz) instead of policy evaluation')
     args = parser.parse_args()
 
-    experiments = get_experiments()
+    experiments = get_training_experiments() if args.training else get_experiments()
 
     if args.list:
         print(f'{len(experiments)} experiments:')

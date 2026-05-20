@@ -18,6 +18,9 @@ parsec-2.1/.parsec_source :
 	patch -p3 -dparsec-2.1 < patches/raytrace-Xext-fix.patch
 	patch -p1 -dparsec-2.1 < patches/heartbeat.patch
 	patches/fixPODSyntax.sh
+	# GCC 7 makes destructors implicitly noexcept; PARSEC 2.1's throw() specs on
+	# virtual dtors are incompatible.  Force C++98 globally for all packages.
+	echo 'CXXFLAGS="$${CXXFLAGS} -std=gnu++98"' >> parsec-2.1/config/gcc-sniper.bldconf
 	# Once the download succeeded and we applied all patches, mark as done
 	touch parsec-2.1/.parsec_source
 
