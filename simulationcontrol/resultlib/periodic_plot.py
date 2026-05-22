@@ -50,7 +50,12 @@ def get_core_aggregate(df, core_level=False, atype='sum'):
 # Read data from file, aggregate subcomponents if needed and plot values.
 def plot_periodic_log(filename, core_level=False, no_display=True,
         atype='sum', x_label='Time (ms)', y_label='Metric'):
-    df_all = pd.read_csv(filename, delim_whitespace=True)
+    try:
+        df_all = pd.read_csv(filename, delim_whitespace=True)
+    except Exception:
+        return
+    if df_all.empty:
+        return
     dfs = get_core_aggregate(df_all, core_level, atype)
 
     filename, _ = os.path.splitext(filename) # remove .gz, confuses suffix
